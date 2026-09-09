@@ -1,0 +1,2 @@
+"""Eventos imutáveis e consulta."""
+
