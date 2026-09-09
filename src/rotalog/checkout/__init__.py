@@ -1,2 +1,0 @@
-"""Sessões pré-pedido."""
-

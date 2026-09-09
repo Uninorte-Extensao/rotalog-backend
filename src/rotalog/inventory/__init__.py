@@ -1,2 +1,0 @@
-"""Saldos, reservas e capacidade."""
-

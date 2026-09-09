@@ -1,2 +1,1 @@
-"""Contestação, mediação e revisão."""
-
+"""Contestação, decisão e revisão."""

@@ -1,2 +1,0 @@
-"""Produtos canônicos e ofertas."""
-

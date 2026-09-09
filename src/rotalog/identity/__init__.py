@@ -1,2 +1,1 @@
-"""Usuários, autenticação, sessões e MFA."""
-
+"""Usuários, sessões e autenticação."""

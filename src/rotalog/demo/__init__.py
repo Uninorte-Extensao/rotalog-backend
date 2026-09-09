@@ -1,2 +1,1 @@
-"""Execuções, relógio e cenários sintéticos."""
-
+"""DemoRun, relógio e cenários sintéticos."""

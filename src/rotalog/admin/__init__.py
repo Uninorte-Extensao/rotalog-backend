@@ -1,2 +1,0 @@
-"""Operações excepcionais da plataforma."""
-

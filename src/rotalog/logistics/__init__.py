@@ -1,2 +1,1 @@
-"""Rotas, paradas, motoristas e custódia."""
-
+"""Rotas, otimização, rastreamento, custódia, entrega e retorno."""
