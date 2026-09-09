@@ -1,6 +1,12 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -8,29 +14,34 @@ permissions:
 
 jobs:
   ci:
-    name: Java 17 com Maven
+    name: Python 3.13
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Obter código-fonte
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
-      - name: Configurar Java 17
-        uses: actions/setup-java@v5
+      - name: Configurar Python 3.13
+        uses: actions/setup-python@v5
         with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Baixar dependências
-        run: mvn --batch-mode --no-transfer-progress dependency:go-offline
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
 
-      - name: Executar lint
-        run: mvn --batch-mode --no-transfer-progress checkstyle:check
+      - name: Validar compilação
+        run: python -m compileall -q src
+
+      - name: Validar importação da aplicação
+        run: python -c "from rotalog.api.main import app; assert app.title == 'RotaLog API'"
 
       - name: Executar testes
-        run: mvn --batch-mode --no-transfer-progress test
-
-      - name: Executar build
-        run: mvn --batch-mode --no-transfer-progress package -DskipTests
+        if: ${{ hashFiles('tests/**/*.py') != '' }}
+        run: |
+          python -m pip install pytest
+          python -m pytest
