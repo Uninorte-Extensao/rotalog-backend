@@ -1,2 +1,1 @@
-"""Empresas, memberships, papéis e convites."""
-
+"""Empresas, vínculos e papéis."""

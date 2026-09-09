@@ -1,2 +1,0 @@
-"""Metadados, autorização e storage."""
-

@@ -1,2 +1,0 @@
-"""Tentativas, prova e retorno."""
-

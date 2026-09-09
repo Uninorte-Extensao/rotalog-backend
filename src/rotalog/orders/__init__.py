@@ -1,2 +1,0 @@
-"""Pedido comercial e transições."""
-
