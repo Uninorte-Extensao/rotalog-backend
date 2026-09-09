@@ -1,20 +1,15 @@
-name: CI
+name: Validação pós-merge (main)
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  ci:
-    name: Python 3.13
+  build-main:
+    name: Build e testes da main
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -29,19 +24,22 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - name: Baixar dependências
+      - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          python -m pip install pytest
 
-      - name: Validar compilação
+      - name: Build de produção
         run: python -m compileall -q src
 
       - name: Validar importação da aplicação
-        run: python -c "from rotalog.api.main import app; assert app.title == 'RotaLog API'"
+        run: PYTHONPATH=src python -c "from rotalog.api.main import app; assert app.title == 'RotaLog API'"
 
-      - name: Executar testes
-        if: ${{ hashFiles('tests/**/*.py') != '' }}
+      - name: Testes
         run: |
-          python -m pip install pytest
-          python -m pytest
+          if find tests -type f -name 'test_*.py' -o -name '*_test.py' 2>/dev/null | grep -q .; then
+            python -m pytest
+          else
+            echo "Nenhum teste Python encontrado; etapa concluída sem testes para executar."
+          fi
