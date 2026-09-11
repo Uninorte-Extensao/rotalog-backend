@@ -1,4 +1,3 @@
-[Uploading README.md…]()
 # RotaLog Backend
 
 API e núcleo de regras de negócio do **RotaLog**, um marketplace B2B para reposição de alimentos secos e industrializados que conecta empresas compradoras, fornecedores, motoristas e a operação da RotaLog.
