@@ -16,6 +16,7 @@ def test_create_app_uses_validated_settings() -> None:
         app_version="9.9.9",
         environment=Environment.TEST,
         debug=True,
+        database_url="postgresql+psycopg://localhost/rotalog_test",
     )
 
     app = create_app(settings)
@@ -27,7 +28,13 @@ def test_create_app_uses_validated_settings() -> None:
 
 
 def test_health_check_reports_process_availability() -> None:
-    app = create_app(Settings(_env_file=None, environment=Environment.TEST))
+    app = create_app(
+        Settings(
+            _env_file=None,
+            environment=Environment.TEST,
+            database_url="postgresql+psycopg://localhost/rotalog_test",
+        )
+    )
 
     async def request_health(headers: dict[str, str] | None = None) -> Response:
         transport = ASGITransport(app=app)
@@ -50,7 +57,13 @@ def test_health_check_reports_process_availability() -> None:
 
 
 def test_openapi_uses_canonical_error_contract() -> None:
-    app = create_app(Settings(_env_file=None, environment=Environment.TEST))
+    app = create_app(
+        Settings(
+            _env_file=None,
+            environment=Environment.TEST,
+            database_url="postgresql+psycopg://localhost/rotalog_test",
+        )
+    )
 
     schema = app.openapi()
 

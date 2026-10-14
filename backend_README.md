@@ -130,6 +130,11 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
+cp .env.example .env
+# Edite a URL do PostgreSQL com as credenciais somente no arquivo local .env.
+
+python -m alembic upgrade head
+
 fastapi dev src/rotalog/api/main.py
 ```
 
@@ -145,7 +150,7 @@ Com a API em execução:
 - Swagger UI: `http://127.0.0.1:8000/docs`;
 - OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`.
 
-Variáveis de ambiente e secrets não devem possuir defaults inseguros, ser commitidos ou aparecer em logs. Quando os serviços persistentes forem adicionados, utilize um arquivo local ignorado pelo Git e mantenha um `.env.example` sem credenciais reais.
+Variáveis de ambiente e secrets não possuem defaults, não devem ser commitidos ou aparecer em logs. A variável `ROTALOG_DATABASE_URL` é obrigatória; utilize um arquivo `.env` local ignorado pelo Git e mantenha apenas placeholders no `.env.example`.
 
 ## Convenções de integração
 

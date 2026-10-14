@@ -19,7 +19,13 @@ async def _get(app, path: str) -> Response:
 
 
 def test_expected_error_uses_canonical_envelope_and_request_id() -> None:
-    app = create_app(Settings(_env_file=None, environment=Environment.TEST))
+    app = create_app(
+        Settings(
+            _env_file=None,
+            environment=Environment.TEST,
+            database_url="postgresql+psycopg://localhost/rotalog_test",
+        )
+    )
 
     @app.get("/api/v1/failure")
     async def failure() -> None:
@@ -44,7 +50,13 @@ def test_expected_error_uses_canonical_envelope_and_request_id() -> None:
 
 
 def test_framework_http_error_uses_canonical_envelope() -> None:
-    app = create_app(Settings(_env_file=None, environment=Environment.TEST))
+    app = create_app(
+        Settings(
+            _env_file=None,
+            environment=Environment.TEST,
+            database_url="postgresql+psycopg://localhost/rotalog_test",
+        )
+    )
 
     response = asyncio.run(_get(app, "/missing"))
 

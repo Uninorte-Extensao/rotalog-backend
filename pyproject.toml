@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "API backend do RotaLog"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "alembic>=1.14,<2",
     "fastapi[standard]>=0.115,<1.0",
     "pydantic>=2,<3",
     "pydantic-settings>=2,<3",
