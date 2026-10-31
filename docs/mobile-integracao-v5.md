@@ -134,7 +134,7 @@ O scanner continua `SYNTHETIC_IMAGE_VALIDATION_ONLY`, não antivírus. Storage S
 
 ## Preparar e testar localmente
 
-Aplicar `alembic upgrade head` (nova revisão `20261023_0009`), executar o seed configurado e iniciar API e worker. Não apagar volumes, não editar dados operacionais diretamente no banco e não executar testes sobre o banco da demo.
+Aplicar `alembic upgrade head` (incluindo a revisão de isolamento `20261031_0010`), executar o seed configurado e iniciar API e worker. Não apagar volumes, não editar dados operacionais diretamente no banco e não executar testes sobre o banco da demo.
 
 ```bash
 # Com API e worker disponíveis e secrets configurados no ambiente:
@@ -144,7 +144,7 @@ Aplicar `alembic upgrade head` (nova revisão `20261023_0009`), executar o seed 
 .venv/bin/python scripts/smoke_demo.py --prepare-mobile
 ```
 
-Esses comandos são opt-in e **criam dados sintéticos persistentes**. O segundo mantém o motorista ocupado nessa rota até encerramento/cancelamento autorizado. Usa o motorista do seed; senha vem de `ROTALOG_DEMO_PASSWORD`. Para entrar também nas novas contas de comprador/fornecedor, configurar previamente `ROTALOG_SMOKE_ACCOUNT_PASSWORD` (12–1024 caracteres) em ambiente privado. Sem isso, a senha dessas contas é aleatória e não exportada. O relatório mostra somente IDs/emails e resultados, nunca senhas/tokens. Não commitar esses valores. Em destino remoto, é exigido `--allow-remote` explícito.
+Esses comandos são opt-in e **criam dados sintéticos persistentes**. O segundo mantém o motorista ocupado nessa rota até encerramento/cancelamento autorizado. Cada cenário agora provisiona planejador e motorista vinculados ao seu fornecedor. Configure previamente `ROTALOG_SMOKE_ACCOUNT_PASSWORD` (12–1024 caracteres) para entrar nas contas de comprador, fornecedor, planejador e motorista. Sem isso, a senha dessas contas é aleatória e não exportada. O relatório de `--prepare-mobile` mostra seus emails em `synthetic_accounts`, nunca senhas/tokens. `ROTALOG_DEMO_PASSWORD` autentica a conta administrativa do seed, sem ser copiada para essas contas. Não commitar esses valores. Em destino remoto, é exigido `--allow-remote` explícito.
 
 `--with-mobile` percorre cadastro, compra simulada, preparação, publicação/aprovação, conferência, falta sintética, resolução pelo fornecedor, reconferência, recebimento, início, lote GPS idempotente, prova processada pelo worker e encerramento. Falta de worker não é tratada como sucesso. `--with-delivery` continua disponível para validar o adaptador anterior.
 

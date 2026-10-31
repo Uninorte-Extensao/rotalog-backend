@@ -24,13 +24,21 @@ def require_demo(settings: Settings) -> str:
     return settings.jwt_secret.get_secret_value()
 
 
+def require_identity(settings: Settings) -> str:
+    if settings.jwt_secret is None:
+        fail("AUTH_DISABLED", "Autenticação não configurada.", 403)
+    return settings.jwt_secret.get_secret_value()
+
+
 def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
 def csrf_token(session_id: str, settings: Settings) -> str:
     return hmac.new(
-        require_demo(settings).encode(), f"csrf:{session_id}".encode(), hashlib.sha256
+        require_identity(settings).encode(),
+        f"csrf:{session_id}".encode(),
+        hashlib.sha256,
     ).hexdigest()
 
 
@@ -50,13 +58,13 @@ def create_access_token(
             "aud": AUDIENCE,
             "jti": str(uuid4()),
         },
-        require_demo(settings),
+        require_identity(settings),
         algorithm="HS256",
     )
 
 
 def decode_access_token(token: str, settings: Settings) -> dict:
-    secret = require_demo(settings)
+    secret = require_identity(settings)
     try:
         return jwt.decode(
             token,

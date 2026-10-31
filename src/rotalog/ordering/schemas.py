@@ -78,7 +78,7 @@ class CheckoutResponse(BaseModel):
     total: str
     items: list[CheckoutLineResponse]
     purchase_id: UUID | None
-    is_synthetic: Literal[True]
+    is_synthetic: bool
 
 
 class PaymentConfirmationResponse(BaseModel):
@@ -89,7 +89,7 @@ class PaymentConfirmationResponse(BaseModel):
     provider: Literal["SIMULATED"]
     total: str
     currency: Literal["BRL"]
-    is_synthetic: Literal[True]
+    is_synthetic: bool
 
 
 class FulfillmentLineResponse(BaseModel):
@@ -106,7 +106,7 @@ class FulfillmentResponse(BaseModel):
     warehouse_id: UUID
     state: str
     version: int
-    is_synthetic: Literal[True]
+    is_synthetic: bool
     lines: list[FulfillmentLineResponse]
 
 
@@ -149,7 +149,7 @@ class SupplierOrderResponse(BaseModel):
     cancellation_reason: str | None
     items: list[OrderItemResponse]
     allowed_actions: list[str]
-    is_synthetic: Literal[True]
+    is_synthetic: bool
     fulfillments: list[FulfillmentResponse]
     created_at: datetime
     updated_at: datetime
@@ -161,4 +161,4 @@ class PurchaseResponse(BaseModel):
     checkout_id: UUID
     state: str
     supplier_orders: list[SupplierOrderResponse]
-    is_synthetic: Literal[True]
+    is_synthetic: bool

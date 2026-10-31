@@ -20,11 +20,13 @@ services:
       ROTALOG_DATABASE_URL: postgresql+psycopg://rotalog:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@db:5432/rotalog_demo
       ROTALOG_ENVIRONMENT: ${ROTALOG_ENVIRONMENT:-development}
       ROTALOG_DEBUG: "false"
-      ROTALOG_DEMO_ENABLED: "true"
+      ROTALOG_DEMO_ENABLED: ${ROTALOG_DEMO_ENABLED:-false}
+      ROTALOG_DATA_CONTEXT_ID: ${ROTALOG_DATA_CONTEXT_ID:-}
       ROTALOG_JWT_SECRET: ${ROTALOG_JWT_SECRET:?Defina ROTALOG_JWT_SECRET}
-      ROTALOG_DEMO_PASSWORD: ${ROTALOG_DEMO_PASSWORD:?Defina uma senha sintética forte}
+      ROTALOG_DEMO_PASSWORD: ${ROTALOG_DEMO_PASSWORD:-}
       ROTALOG_CORS_ORIGINS: ${ROTALOG_CORS_ORIGINS:-[]}
       ROTALOG_COOKIE_SECURE: ${ROTALOG_COOKIE_SECURE:-false}
+      ROTALOG_COOKIE_SAMESITE: ${ROTALOG_COOKIE_SAMESITE:-lax}
       ROTALOG_PRODUCT_IMAGES_ROOT: /var/lib/rotalog/product-images
       ROTALOG_PRODUCT_IMAGES_PER_PRODUCT: ${ROTALOG_PRODUCT_IMAGES_PER_PRODUCT:-5}
       ROTALOG_PRODUCT_IMAGE_MAX_BYTES: ${ROTALOG_PRODUCT_IMAGE_MAX_BYTES:-8388608}
@@ -36,7 +38,7 @@ services:
       ROTALOG_TRACKING_BATCHES_PER_MINUTE: ${ROTALOG_TRACKING_BATCHES_PER_MINUTE:-20}
     volumes:
       - product_images:/var/lib/rotalog/product-images
-    command: [sh, -c, "alembic upgrade head && python -m rotalog.demo.seed && exec uvicorn rotalog.api.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
+    command: [sh, -c, "python -m rotalog.operations.startup && exec uvicorn rotalog.api.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

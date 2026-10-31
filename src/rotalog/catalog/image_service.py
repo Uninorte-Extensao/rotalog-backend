@@ -8,9 +8,10 @@ from rotalog.catalog.image_schemas import ProductImageResponse
 from rotalog.catalog.models import Product, ProductImage, ProductImageEvent
 from rotalog.catalog.service import image_product
 from rotalog.core.contracts import check_version, fail
+from rotalog.core.data_mode import is_synthetic_data
 from rotalog.core.database import transactional_session
 from rotalog.identity.models import Role
-from rotalog.identity.security import require_demo
+from rotalog.identity.security import require_identity
 from rotalog.identity.service import authorize
 from rotalog.operations.file_models import StoredFile
 from rotalog.operations.file_service import available_product_file, read_content
@@ -82,7 +83,7 @@ def gallery_metadata(session, product):
         "primary_image_id": next(
             (image.id for image in images if image.is_primary), None
         ),
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -95,7 +96,7 @@ def get_gallery(product_id, actor, factory):
 def gallery_command(
     product_id, command, data, key, actor, factory, settings, *, image_id=None
 ):
-    require_demo(settings)
+    require_identity(settings)
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.ADMIN}, write=True)
         product = image_product(session, product_id, actor, write=True)

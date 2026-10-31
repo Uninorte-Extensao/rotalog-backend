@@ -14,6 +14,66 @@ from rotalog.core.database import transactional_session
 from rotalog.inventory.models import InventoryProjection
 
 
+def test_frontend_upgrade_recovers_owners_without_guessing(
+    demo_client, alembic_config, database_url
+):
+    from test_delivery import prepared
+
+    data = prepared(demo_client)
+    command.downgrade(alembic_config, "20261023_0009")
+    engine = sa.create_engine(database_url)
+    unassigned_id = uuid4()
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text(
+                    "INSERT INTO vehicle(id,demo_run_id,registration,package_units,weight_grams,volume_cm3) "
+                    "SELECT :id,demo_run_id,'SEM-VINCULO',10,100,100 FROM vehicle LIMIT 1"
+                ),
+                {"id": unassigned_id},
+            )
+        command.upgrade(alembic_config, "head")
+        command.check(alembic_config)
+        with engine.connect() as connection:
+            supplier_id = connection.scalar(
+                sa.text(
+                    "SELECT supplier_organization_id FROM supplier_order WHERE id=:id"
+                ),
+                {"id": data["order"]["id"]},
+            )
+            assert (
+                connection.scalar(
+                    sa.text(
+                        "SELECT supplier_organization_id FROM route_plan_version WHERE id=:id"
+                    ),
+                    {"id": data["plan"]["id"]},
+                )
+                == supplier_id
+            )
+            assert (
+                connection.scalar(
+                    sa.text(
+                        "SELECT supplier_organization_id FROM vehicle WHERE id=:id"
+                    ),
+                    {"id": data["route"]["vehicle_id"]},
+                )
+                == supplier_id
+            )
+            assert (
+                connection.scalar(
+                    sa.text(
+                        "SELECT supplier_organization_id FROM vehicle WHERE id=:id"
+                    ),
+                    {"id": unassigned_id},
+                )
+                is None
+            )
+            assert connection.scalar(sa.text("SELECT count(*) FROM route")) == 1
+            assert connection.scalar(sa.text("SELECT count(*) FROM category")) == 1
+    finally:
+        engine.dispose()
+
+
 def test_mobile_upgrade_preserves_previous_route_private_blob_and_product_file(
     demo_client, alembic_config, database_url
 ):

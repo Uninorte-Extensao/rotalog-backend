@@ -5,7 +5,15 @@ from datetime import UTC, datetime, timedelta
 
 from PIL import Image
 from sqlalchemy import func, select
-from test_catalog_ordering import account, checkout, login, ok, purchase, setup_supply
+from test_catalog_ordering import (
+    PASSWORD,
+    account,
+    checkout,
+    login,
+    ok,
+    purchase,
+    setup_supply,
+)
 
 from rotalog.core.database import transactional_session
 from rotalog.logistics.delivery_models import CustodyEvent, DeliveryOutcomeLine
@@ -20,7 +28,7 @@ def _command(client, path, headers, version, key):
 
 
 def prepared(client):
-    supplier, _profile, _product, warehouse, offer, _balance, capacity = setup_supply(
+    supplier, profile, _product, warehouse, offer, _balance, capacity = setup_supply(
         client
     )
     buyer, _buyer_profile = account(client, "recebedor", "BUYER_ADMIN")
@@ -90,8 +98,35 @@ def prepared(client):
             "unused-header",
         )
     )
-    planner, _ = login(client, "planejador")
-    driver, driver_user = login(client, "motorista")
+    admin, _ = login(client)
+    ok(
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin,
+            json={
+                "email": "planejador.pizza@demo.rotalog.invalid",
+                "name": "Planejador Pizza Sintético",
+                "password": PASSWORD,
+                "role": "ROUTE_PLANNER",
+                "organization_id": profile["organization_id"],
+            },
+        ),
+        201,
+    )
+    planner, _ = login(client, "planejador.pizza", PASSWORD)
+    driver_user = ok(
+        client.post(
+            "/api/v1/drivers",
+            headers=planner,
+            json={
+                "email": "motorista.pizza@demo.rotalog.invalid",
+                "name": "Motorista Pizza Sintético",
+                "password": PASSWORD,
+            },
+        ),
+        201,
+    )
+    driver, _ = login(client, "motorista.pizza", PASSWORD)
     vehicle = ok(
         client.post(
             "/api/v1/vehicles",
@@ -495,12 +530,13 @@ def test_planner_provisions_driver_and_other_roles_are_denied(demo_client):
     assert denied.status_code == 403
     public_registration = demo_client.post(
         "/api/v1/auth/register",
-        json=payload
-        | {"organization_name": "Motoristas Sintéticos", "role": "DRIVER"},
+        json=payload | {"organization_name": "Motoristas Sintéticos", "role": "DRIVER"},
     )
     assert public_registration.status_code == 422
 
-    created = ok(demo_client.post("/api/v1/drivers", headers=planner, json=payload), 201)
+    created = ok(
+        demo_client.post("/api/v1/drivers", headers=planner, json=payload), 201
+    )
     assert created["role"] == "DRIVER"
     assert created["name"] == payload["name"]
     assert created["organizations"][0]["role"] == "DRIVER"
@@ -513,7 +549,9 @@ def test_planner_provisions_driver_and_other_roles_are_denied(demo_client):
         demo_client, "novo.motorista", "senha-inicial-sintetica-2026"
     )
     assert user["id"] == created["id"]
-    assert demo_client.get("/api/v1/me", headers=authenticated).json()["role"] == "DRIVER"
+    assert (
+        demo_client.get("/api/v1/me", headers=authenticated).json()["role"] == "DRIVER"
+    )
 
 
 def test_evidence_rejects_non_images_and_other_attempt(demo_client):

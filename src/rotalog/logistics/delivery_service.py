@@ -12,13 +12,14 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 
 from rotalog.core.config import Settings
 from rotalog.core.contracts import Page, check_version, fail
+from rotalog.core.data_mode import is_synthetic_data
 from rotalog.core.database import transactional_session
 from rotalog.identity.models import Role, User
-from rotalog.identity.service import authorize
+from rotalog.identity.service import authorize, require_supplier_organization
 from rotalog.inventory.models import InventoryProjection, Reservation, Warehouse
 from rotalog.logistics.delivery_models import (
     CustodyEvent,
@@ -48,6 +49,7 @@ from rotalog.ordering.models import (
     OrderItem,
     SupplierOrder,
 )
+from rotalog.organizations.models import Membership
 
 MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
 
@@ -91,6 +93,8 @@ def _route(session, route_id, actor, *, lock=False):
     orders = _orders(session, route.id)
     permitted = (
         actor.role == Role.PLANNER
+        and session.get(Warehouse, route.warehouse_id).supplier_organization_id
+        == actor.organization_id
         or actor.role == Role.DRIVER
         and assignment.driver_id == actor.id
         or actor.role == Role.SUPPLIER
@@ -119,7 +123,7 @@ def route_summary(session, route):
         "driver_id": str(assignment.driver_id),
         "vehicle_id": str(assignment.vehicle_id),
         "updated_at": route.updated_at.isoformat(),
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -223,6 +227,7 @@ def _route_response(session, route, actor):
 def vehicles(data, actor, factory):
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.PLANNER}, write=data is not None)
+        require_supplier_organization(session, actor)
         if data:
             if session.scalar(
                 select(Vehicle.id).where(
@@ -233,23 +238,34 @@ def vehicles(data, actor, factory):
                 fail(
                     "VEHICLE_ALREADY_EXISTS", "Identificação de veículo já cadastrada."
                 )
-            item = Vehicle(**data.model_dump(), demo_run_id=actor.demo_run_id)
+            item = Vehicle(
+                **data.model_dump(),
+                demo_run_id=actor.demo_run_id,
+                supplier_organization_id=actor.organization_id,
+            )
             session.add(item)
             session.flush()
-            return dict(id=str(item.id), **data.model_dump(), is_synthetic=True)
+            return dict(
+                id=str(item.id),
+                supplier_organization_id=str(actor.organization_id),
+                **data.model_dump(),
+                is_synthetic=is_synthetic_data(),
+            )
         return [
             {
                 "id": str(v.id),
                 "registration": v.registration,
+                "supplier_organization_id": str(v.supplier_organization_id),
                 "package_units": v.package_units,
                 "weight_grams": v.weight_grams,
                 "volume_cm3": v.volume_cm3,
-                "is_synthetic": True,
+                "is_synthetic": is_synthetic_data(),
             }
             for v in session.scalars(
                 select(Vehicle)
                 .where(
                     Vehicle.demo_run_id == actor.demo_run_id,
+                    Vehicle.supplier_organization_id == actor.organization_id,
                     Vehicle.is_active.is_(True),
                 )
                 .order_by(Vehicle.id)
@@ -261,19 +277,124 @@ def vehicles(data, actor, factory):
 def drivers(actor, factory):
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.PLANNER})
+        require_supplier_organization(session, actor)
         return [
-            {"id": str(u.id), "name": u.name, "is_synthetic": True}
+            {"id": str(u.id), "name": u.name, "is_synthetic": is_synthetic_data()}
             for u in session.scalars(
                 select(User)
+                .join(Membership, Membership.user_id == User.id)
                 .where(
                     User.demo_run_id == actor.demo_run_id,
-                    User.role == Role.DRIVER,
+                    Membership.role == Role.DRIVER,
+                    Membership.organization_id == actor.organization_id,
+                    Membership.is_active.is_(True),
                     User.is_active.is_(True),
                 )
                 .order_by(User.id)
                 .limit(100)
             )
         ]
+
+
+def eligible_fulfillments(actor, factory, page=1, page_size=25, warehouse_id=None):
+    with transactional_session(factory) as session:
+        authorize(session, actor, {Role.PLANNER})
+        require_supplier_organization(session, actor)
+        valid_lines = (
+            select(FulfillmentLine.id)
+            .join(OrderItem)
+            .where(
+                FulfillmentLine.fulfillment_id == Fulfillment.id,
+            )
+        )
+        invalid_lines = valid_lines.where(
+            (FulfillmentLine.separated_quantity <= 0)
+            | (FulfillmentLine.dispatched_quantity != 0)
+            | (
+                func.coalesce(
+                    OrderItem.product_snapshot["gross_weight_grams"].as_integer(), 0
+                )
+                <= 0
+            )
+            | (
+                func.coalesce(OrderItem.product_snapshot["volume_cm3"].as_integer(), 0)
+                <= 0
+            )
+        )
+        assigned = (
+            select(RouteLoad.id)
+            .join(Route)
+            .where(
+                RouteLoad.fulfillment_id == Fulfillment.id, Route.state != "CANCELLED"
+            )
+        )
+        query = (
+            select(Fulfillment)
+            .join(SupplierOrder)
+            .join(Warehouse, Warehouse.id == Fulfillment.warehouse_id)
+            .where(
+                SupplierOrder.demo_run_id == actor.demo_run_id,
+                SupplierOrder.supplier_organization_id == actor.organization_id,
+                SupplierOrder.state.in_(("READY_TO_DISPATCH", "PARTIALLY_DISPATCHED")),
+                Warehouse.demo_run_id == actor.demo_run_id,
+                Warehouse.supplier_organization_id == actor.organization_id,
+                Warehouse.is_active.is_(True),
+                Warehouse.geocoding_state == "CONFIRMED",
+                Fulfillment.state == "READY_TO_DISPATCH",
+                exists(valid_lines),
+                ~exists(invalid_lines),
+                ~exists(assigned),
+            )
+        )
+        if warehouse_id:
+            query = query.where(Fulfillment.warehouse_id == warehouse_id)
+        total = session.scalar(select(func.count()).select_from(query.subquery()))
+        items = []
+        for load in session.scalars(
+            query.order_by(Fulfillment.created_at, Fulfillment.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ):
+            order = session.get(SupplierOrder, load.supplier_order_id)
+            lines = session.execute(
+                select(FulfillmentLine, OrderItem)
+                .join(OrderItem)
+                .where(FulfillmentLine.fulfillment_id == load.id)
+                .order_by(FulfillmentLine.id)
+            ).all()
+            items.append(
+                {
+                    "id": load.id,
+                    "supplier_order_id": order.id,
+                    "supplier_organization_id": order.supplier_organization_id,
+                    "buyer_organization_id": order.buyer_organization_id,
+                    "warehouse_id": load.warehouse_id,
+                    "state": load.state,
+                    "version": load.version,
+                    "package_units": sum(
+                        line.separated_quantity for line, item in lines
+                    ),
+                    "weight_grams": sum(
+                        line.separated_quantity
+                        * item.product_snapshot["gross_weight_grams"]
+                        for line, item in lines
+                    ),
+                    "volume_cm3": sum(
+                        line.separated_quantity * item.product_snapshot["volume_cm3"]
+                        for line, item in lines
+                    ),
+                    "lines": [
+                        {
+                            "id": line.id,
+                            "order_item_id": item.id,
+                            "separated_quantity": line.separated_quantity,
+                            "product_snapshot": item.product_snapshot,
+                        }
+                        for line, item in lines
+                    ],
+                }
+            )
+        return Page(items=items, total=total, page=page, page_size=page_size)
 
 
 def _validate_plan(session, snapshot, actor):
@@ -283,16 +404,20 @@ def _validate_plan(session, snapshot, actor):
         select(Warehouse).where(
             Warehouse.id == UUID(snapshot["warehouse_id"]),
             Warehouse.demo_run_id == actor.demo_run_id,
+            Warehouse.supplier_organization_id == actor.organization_id,
             Warehouse.is_active.is_(True),
         )
     )
-    if not warehouse or warehouse.geocoding_state != "CONFIRMED":
+    if not warehouse:
+        fail("WAREHOUSE_NOT_FOUND", "Origem não encontrada.", 404)
+    if warehouse.geocoding_state != "CONFIRMED":
         fail("WAREHOUSE_NOT_ELIGIBLE", "Origem precisa estar ativa e geocodificada.")
     vehicle = session.scalar(
         select(Vehicle)
         .where(
             Vehicle.id == UUID(snapshot["vehicle_id"]),
             Vehicle.demo_run_id == actor.demo_run_id,
+            Vehicle.supplier_organization_id == actor.organization_id,
             Vehicle.is_active.is_(True),
         )
         .with_for_update()
@@ -302,19 +427,31 @@ def _validate_plan(session, snapshot, actor):
         .where(
             User.id == UUID(snapshot["driver_id"]),
             User.demo_run_id == actor.demo_run_id,
-            User.role == Role.DRIVER,
+            exists(
+                select(Membership.id).where(
+                    Membership.user_id == User.id,
+                    Membership.organization_id == actor.organization_id,
+                    Membership.role == Role.DRIVER,
+                    Membership.is_active.is_(True),
+                )
+            ),
             User.is_active.is_(True),
         )
         .with_for_update()
     )
     if not vehicle or not driver:
-        fail("ASSIGNMENT_NOT_ELIGIBLE", "Motorista ou veículo não elegível.")
+        fail("ASSIGNMENT_NOT_ELIGIBLE", "Motorista ou veículo não elegível.", 404)
     loads = list(
         session.scalars(
             select(Fulfillment)
-            .where(Fulfillment.id.in_([UUID(i) for i in snapshot["fulfillment_ids"]]))
+            .join(SupplierOrder)
+            .where(
+                Fulfillment.id.in_([UUID(i) for i in snapshot["fulfillment_ids"]]),
+                SupplierOrder.demo_run_id == actor.demo_run_id,
+                SupplierOrder.supplier_organization_id == actor.organization_id,
+            )
             .order_by(Fulfillment.id)
-            .with_for_update()
+            .with_for_update(of=Fulfillment)
         )
     )
     if len(loads) != len(snapshot["fulfillment_ids"]):
@@ -332,6 +469,7 @@ def _validate_plan(session, snapshot, actor):
         order = session.get(SupplierOrder, load.supplier_order_id)
         if (
             order.demo_run_id != actor.demo_run_id
+            or order.supplier_organization_id != actor.organization_id
             or load.warehouse_id != warehouse.id
             or load.state != "READY_TO_DISPATCH"
             or order.state not in {"READY_TO_DISPATCH", "PARTIALLY_DISPATCHED"}
@@ -400,7 +538,10 @@ def _plan_response(plan):
         "version": plan.version,
         "snapshot": plan.snapshot,
         "reason": plan.reason,
-        "is_synthetic": True,
+        "supplier_organization_id": str(plan.supplier_organization_id)
+        if plan.supplier_organization_id
+        else None,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -409,6 +550,7 @@ def create_plan(data: ManualPlanCreate, key, actor, factory):
 
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.PLANNER}, write=True)
+        require_supplier_organization(session, actor)
         payload = data.model_dump(mode="json", exclude_none=True)
         operation = "manual-route-plan:create"
         cached, digest = begin_idempotency(session, actor, operation, key, payload)
@@ -417,6 +559,7 @@ def create_plan(data: ManualPlanCreate, key, actor, factory):
         _validate_plan(session, payload, actor)
         plan = RoutePlanVersion(
             demo_run_id=actor.demo_run_id,
+            supplier_organization_id=actor.organization_id,
             created_by=actor.id,
             snapshot=payload
             | {"cargo_fingerprint": cargo_fingerprint(session, data.fulfillment_ids)},
@@ -440,11 +583,13 @@ def create_plan(data: ManualPlanCreate, key, actor, factory):
 def plan_command(plan_id, command, data, key, actor, factory):
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.PLANNER}, write=command != "get")
+        require_supplier_organization(session, actor)
         plan = session.scalar(
             select(RoutePlanVersion)
             .where(
                 RoutePlanVersion.id == plan_id,
                 RoutePlanVersion.demo_run_id == actor.demo_run_id,
+                RoutePlanVersion.supplier_organization_id == actor.organization_id,
             )
             .with_for_update()
         )
@@ -565,6 +710,11 @@ def get_routes(
         if route_id:
             return response(session, _route(session, route_id, actor))
         query = select(Route).where(Route.demo_run_id == actor.demo_run_id)
+        if actor.role == Role.PLANNER:
+            require_supplier_organization(session, actor)
+            query = query.join(Warehouse).where(
+                Warehouse.supplier_organization_id == actor.organization_id
+            )
         if state:
             query = query.where(Route.state == state)
         if active is not None:
@@ -821,7 +971,7 @@ def _attempt_response(attempt):
         "route_stop_id": str(attempt.route_stop_id),
         "state": attempt.state,
         "version": attempt.version,
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -921,7 +1071,7 @@ def authorize_receiver(
         return {
             "receiver_code": code,
             "expires_at": attempt.authorization_expires_at.isoformat(),
-            "is_synthetic": True,
+            "is_synthetic": is_synthetic_data(),
         }
 
 
@@ -1312,7 +1462,7 @@ def get_proof(attempt_id, actor, factory):
             "validated_at": proof.validated_at,
             "contestation_deadline": proof.contestation_deadline,
             "evidence": proof.payload,
-            "is_synthetic": True,
+            "is_synthetic": is_synthetic_data(),
         }
 
 

@@ -9,7 +9,7 @@ from PIL import Image
 def exercise_delivery(
     request,
     login,
-    password,
+    admin_password,
     suffix,
     supplier,
     buyer,
@@ -18,11 +18,39 @@ def exercise_delivery(
     order,
     offer,
     *,
+    account_password,
     mobile=False,
     prepare_only=False,
 ):
-    planner, _ = login("planejador@demo.rotalog.invalid", password)
-    driver, driver_login = login("motorista@demo.rotalog.invalid", password)
+    admin, _ = login("admin@demo.rotalog.invalid", admin_password)
+    planner_email = f"planejador-{suffix}@demo.rotalog.invalid"
+    request(
+        "POST",
+        "/api/v1/admin/users",
+        expected=201,
+        headers=admin,
+        json={
+            "email": planner_email,
+            "name": "Planejador smoke sintético",
+            "password": account_password,
+            "role": "ROUTE_PLANNER",
+            "organization_id": order["supplier_organization_id"],
+        },
+    )
+    planner, _ = login(planner_email, account_password)
+    driver_email = f"motorista-{suffix}@demo.rotalog.invalid"
+    request(
+        "POST",
+        "/api/v1/drivers",
+        expected=201,
+        headers=planner,
+        json={
+            "email": driver_email,
+            "name": "Motorista smoke sintético",
+            "password": account_password,
+        },
+    )
+    driver, driver_login = login(driver_email, account_password)
     vehicle = request(
         "POST",
         "/api/v1/vehicles",

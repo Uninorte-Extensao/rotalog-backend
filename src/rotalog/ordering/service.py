@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from rotalog.catalog.models import Offer, Product
 from rotalog.catalog.schemas import ProductResponse
 from rotalog.core.contracts import Page, check_version, fail
+from rotalog.core.data_mode import is_synthetic_data
 from rotalog.core.database import transactional_session
 from rotalog.core.money import decimal_string
 from rotalog.demo.models import DemoRun
@@ -75,7 +76,7 @@ def _checkout_response(session: Session, item: CheckoutSession) -> dict:
             for line in lines
         ],
         "purchase_id": str(purchase.id) if purchase else None,
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -355,7 +356,7 @@ def _fulfillment_response(session: Session, item: Fulfillment) -> dict:
         "warehouse_id": str(item.warehouse_id),
         "state": item.state,
         "version": item.version,
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
         "lines": [
             {
                 "id": str(line.id),
@@ -478,7 +479,7 @@ def _order_response(session: Session, item: SupplierOrder, actor: UserResponse) 
         "cancellation_reason": item.cancellation_reason,
         "items": lines,
         "allowed_actions": allowed,
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
         "fulfillments": [
             _fulfillment_response(session, row)
             for row in session.scalars(
@@ -547,7 +548,7 @@ def _purchase_response(
         )
         else "ACTIVE",
         "supplier_orders": [_order_response(session, item, actor) for item in orders],
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 

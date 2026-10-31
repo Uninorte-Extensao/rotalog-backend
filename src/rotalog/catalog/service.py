@@ -1,15 +1,17 @@
 from uuid import UUID
 
 from sqlalchemy import exists, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from rotalog.catalog.models import Offer, OfferPriceVersion, Product
+from rotalog.catalog.models import Category, Offer, OfferPriceVersion, Product
 from rotalog.catalog.schemas import (
     OfferCreate,
     OfferFilters,
     OfferResponse,
     PriceChange,
     ProductCreate,
+    ProductPatch,
     ProductResponse,
 )
 from rotalog.core.contracts import Page, check_version, fail
@@ -64,8 +66,81 @@ def create_product(
 ) -> ProductResponse:
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.ADMIN}, write=True)
+        require_category(session, data.category, actor)
         item = Product(**data.model_dump(), demo_run_id=actor.demo_run_id)
         session.add(item)
+        session.flush()
+        return product_response(session, item)
+
+
+def require_category(session, code, actor):
+    if not session.scalar(
+        select(Category.id).where(
+            Category.demo_run_id == actor.demo_run_id, Category.code == code
+        )
+    ):
+        fail("CATEGORY_NOT_FOUND", "Categoria não encontrada.", 422)
+
+
+def categories(data, actor, factory, page=1, page_size=25):
+    with transactional_session(factory) as session:
+        authorize(
+            session, actor, {Role.ADMIN} if data else None, write=data is not None
+        )
+        if data:
+            category = session.scalar(
+                insert(Category)
+                .values(**data.model_dump(), demo_run_id=actor.demo_run_id)
+                .on_conflict_do_nothing(
+                    index_elements=[Category.demo_run_id, Category.code]
+                )
+                .returning(Category)
+            )
+            if category is None:
+                fail("CATEGORY_ALREADY_EXISTS", "Código de categoria já cadastrado.")
+            return category
+        query = select(Category).where(Category.demo_run_id == actor.demo_run_id)
+        return Page(
+            items=list(
+                session.scalars(
+                    query.order_by(Category.name, Category.id)
+                    .offset((page - 1) * page_size)
+                    .limit(page_size)
+                )
+            ),
+            total=session.scalar(select(func.count()).select_from(query.subquery())),
+            page=page,
+            page_size=page_size,
+        )
+
+
+def edit_product(product_id, data: ProductPatch, actor, factory):
+    with transactional_session(factory) as session:
+        authorize(session, actor, {Role.ADMIN}, write=True)
+        item = image_product(session, product_id, actor, write=True)
+        check_version(item.version, data.expected_version)
+        changes = data.model_dump(exclude_unset=True, exclude={"expected_version"})
+        if "category" in changes:
+            require_category(session, changes["category"], actor)
+        for field, value in changes.items():
+            setattr(item, field, value)
+        item.version += 1
+        session.flush()
+        return product_response(session, item)
+
+
+def unpublish_product(product_id, expected_version, actor, factory):
+    with transactional_session(factory) as session:
+        authorize(session, actor, {Role.ADMIN}, write=True)
+        item = image_product(session, product_id, actor, write=True)
+        check_version(item.version, expected_version)
+        if item.publication_state != "PUBLISHED":
+            fail(
+                "PRODUCT_INVALID_STATE",
+                "Somente produtos publicados podem ser retirados.",
+            )
+        item.publication_state = "UNPUBLISHED"
+        item.version += 1
         session.flush()
         return product_response(session, item)
 
@@ -102,6 +177,7 @@ def publish_product(
                 "Variante histórica incompleta; complete os dados antes de publicar.",
                 422,
             )
+        require_category(session, item.category, actor)
         item.publication_state = "PUBLISHED"
         item.version += 1
         session.flush()
@@ -115,12 +191,17 @@ def list_products(
     page_size: int,
     search: str | None = None,
     product_id: UUID | None = None,
+    *,
+    admin: bool = False,
+    publication_state: str | None = None,
 ):
     with transactional_session(factory) as session:
-        authorize(session, actor)
+        authorize(session, actor, {Role.ADMIN} if admin else None)
         query = select(Product).where(Product.demo_run_id == actor.demo_run_id)
-        if not product_id or actor.role != Role.ADMIN:
+        if not admin and (not product_id or actor.role != Role.ADMIN):
             query = query.where(Product.publication_state == "PUBLISHED")
+        if publication_state:
+            query = query.where(Product.publication_state == publication_state)
         if search:
             query = query.where(Product.name.icontains(search, autoescape=True))
         if product_id:

@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from rotalog.core.contracts import Quantity, Reason, Versioned
+from rotalog.core.data_mode import is_synthetic_data
 
 
 class ManifestCommand(Versioned):
@@ -114,7 +115,7 @@ class CargoSummary(BaseModel):
     read_only: bool
     unresolved_issues: int
     total_sellable_packages: int
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class CargoManifest(CargoSummary):

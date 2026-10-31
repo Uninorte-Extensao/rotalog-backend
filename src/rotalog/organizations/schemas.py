@@ -1,4 +1,3 @@
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -7,4 +6,4 @@ from pydantic import BaseModel
 class SupplierResponse(BaseModel):
     id: UUID
     name: str
-    is_synthetic: Literal[True]
+    is_synthetic: bool

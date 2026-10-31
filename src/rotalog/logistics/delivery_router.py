@@ -17,6 +17,7 @@ from rotalog.logistics import delivery_service as service
 from rotalog.logistics.delivery_schemas import (
     AttemptCreate,
     AttemptResponse,
+    EligibleFulfillmentResponse,
     EvidenceResponse,
     ManualPlanCreate,
     PlanResponse,
@@ -30,6 +31,20 @@ router = APIRouter(tags=["rotas e entrega comprovada"])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)]
 PageNumber = Annotated[int, Query(ge=1)]
 PageSize = Annotated[int, Query(ge=1, le=100)]
+
+
+@router.get(
+    "/route-planning/eligible-fulfillments",
+    response_model=Page[EligibleFulfillmentResponse],
+)
+def eligible_fulfillments(
+    actor: CurrentUser,
+    factory: SessionFactory,
+    page: PageNumber = 1,
+    page_size: PageSize = 25,
+    warehouse_id: UUID | None = None,
+):
+    return service.eligible_fulfillments(actor, factory, page, page_size, warehouse_id)
 
 
 @router.post("/vehicles", status_code=201)
@@ -49,9 +64,12 @@ def drivers(actor: CurrentUser, factory: SessionFactory):
 
 @router.post("/drivers", response_model=UserResponse, status_code=201)
 def create_driver(
-    data: DriverProvisionRequest, actor: CurrentUser, factory: SessionFactory
+    data: DriverProvisionRequest,
+    actor: CurrentUser,
+    factory: SessionFactory,
+    settings: ApplicationSettings,
 ):
-    return identity_service.provision_driver(data, actor, factory)
+    return identity_service.provision_driver(data, actor, factory, settings)
 
 
 @router.post(

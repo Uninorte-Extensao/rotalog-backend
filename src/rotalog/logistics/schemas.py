@@ -2,12 +2,13 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from rotalog.core.contracts import Input, Versioned
+from rotalog.core.data_mode import is_synthetic_data
 
 
 class DeliveryRouteCreate(Versioned):
@@ -48,7 +49,7 @@ class DeliveryRouteResponse(BaseModel):
     last_longitude: Decimal | None
     last_accuracy_meters: Decimal | None
     last_location_at: datetime | None
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class LocationResponse(BaseModel):
@@ -62,7 +63,7 @@ class LocationResponse(BaseModel):
     accuracy_meters: Decimal
     recorded_at: datetime
     created_at: datetime
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class LastLocationResponse(BaseModel):
@@ -74,4 +75,4 @@ class LastLocationResponse(BaseModel):
     accuracy_meters: Decimal
     recorded_at: datetime
     is_stale: bool
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)

@@ -11,7 +11,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 import rotalog.core.models  # noqa: F401
-from rotalog.catalog.models import Offer, OfferPriceVersion, Product
+from rotalog.catalog.models import Category, Offer, OfferPriceVersion, Product
 from rotalog.core.config import Settings, get_settings
 from rotalog.core.database import (
     create_database_engine,
@@ -58,6 +58,19 @@ def seed_demo(
             session.flush()
         elif not run.is_active:
             raise ValueError("Seed não reabre execução encerrada")
+        if not session.scalar(
+            select(Category.id).where(
+                Category.demo_run_id == DEMO_RUN_ID,
+                Category.code == "ALIMENTO_SECO_INDUSTRIALIZADO",
+            )
+        ):
+            session.add(
+                Category(
+                    demo_run_id=DEMO_RUN_ID,
+                    code="ALIMENTO_SECO_INDUSTRIALIZADO",
+                    name="Alimento seco industrializado",
+                )
+            )
         organization_ids = {}
         for user_id, alias, name in users:
             user = session.get(User, user_id)
@@ -98,6 +111,24 @@ def seed_demo(
                     )
                 )
         supplier_id = organization_ids["fornecedor"]
+        # Contas conhecidas do seed operam apenas para a distribuidora sintética.
+        for user_id, role in ((PLANNER_ID, Role.PLANNER), (USERS[2][0], Role.DRIVER)):
+            if not session.scalar(
+                select(Membership.id).where(
+                    Membership.user_id == user_id,
+                    Membership.organization_id == supplier_id,
+                    Membership.role == role,
+                )
+            ):
+                session.add(
+                    Membership(user_id=user_id, organization_id=supplier_id, role=role)
+                )
+            user = session.get(User, user_id)
+            if session.get(Organization, user.organization_id).kind in {
+                "INTERNAL",
+                "BUYER",
+            }:
+                user.organization_id = supplier_id
         warehouse = session.scalar(
             select(Warehouse)
             .where(

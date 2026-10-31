@@ -6,7 +6,7 @@ import time
 import rotalog.core.models  # noqa: F401 — registro completo também no processo isolado
 from rotalog.core.config import get_settings
 from rotalog.core.database import create_database_engine, create_session_factory
-from rotalog.identity.security import require_demo
+from rotalog.identity.security import require_identity
 from rotalog.operations.file_service import process_product_image_files
 from rotalog.ordering.service import expire_checkouts, expire_orders
 
@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument("--once", action="store_true", help="Executa um lote e encerra")
     args = parser.parse_args()
     settings = get_settings()
-    require_demo(settings)
+    require_identity(settings)
     engine = create_database_engine(settings.database_url.get_secret_value())
     try:
         factory = create_session_factory(engine)

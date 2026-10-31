@@ -29,6 +29,9 @@ class Vehicle(UuidPrimaryKeyMixin, TimestampMixin, Base):
         UniqueConstraint("demo_run_id", "registration"),
     )
     demo_run_id: Mapped[UUID] = mapped_column(ForeignKey("demo_run.id"))
+    supplier_organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("organization.id"), index=True
+    )
     registration: Mapped[str] = mapped_column(String(30))
     package_units: Mapped[int] = mapped_column(Integer)
     weight_grams: Mapped[int] = mapped_column(Integer)
@@ -41,6 +44,9 @@ class Vehicle(UuidPrimaryKeyMixin, TimestampMixin, Base):
 class RoutePlanVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "route_plan_version"
     demo_run_id: Mapped[UUID] = mapped_column(ForeignKey("demo_run.id"))
+    supplier_organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("organization.id"), index=True
+    )
     created_by: Mapped[UUID] = mapped_column(ForeignKey("identity_user.id"))
     approved_by: Mapped[UUID | None] = mapped_column(ForeignKey("identity_user.id"))
     state: Mapped[str] = mapped_column(

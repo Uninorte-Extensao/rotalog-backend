@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, StringConstraints
 
 from rotalog.core.contracts import Versioned
+from rotalog.core.data_mode import is_synthetic_data
 
 
 class ProductImageAttach(Versioned):
@@ -37,4 +38,4 @@ class ProductGallery(BaseModel):
     product_version: int
     images: list[ProductImageResponse]
     primary_image_id: UUID | None
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)

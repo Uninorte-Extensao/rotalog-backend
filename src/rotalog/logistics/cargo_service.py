@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from rotalog.core.contracts import check_version, fail
+from rotalog.core.data_mode import is_synthetic_data
 from rotalog.core.database import transactional_session
 from rotalog.identity.models import Role
 from rotalog.identity.service import authorize
@@ -148,7 +149,7 @@ def manifest_response(session, route):
         "lines": lines,
         "total_sellable_packages": sum(i["expected_quantity"] for i in lines),
         "issues": [_issue_response(session, i) for i in issues],
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -365,6 +366,7 @@ def cargo_command(
                 request_id=request_id,
                 idempotency_key=key,
                 details=details,
+                is_synthetic=actor.data_is_synthetic,
             )
         )
         session.flush()

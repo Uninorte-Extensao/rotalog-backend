@@ -1,16 +1,17 @@
-# RotaLog Backend — demo V5
+# RotaLog Backend — V5
 
 API do marketplace B2B de alimentos secos industrializados. Esta versão é um
-**recorte funcional da V5**, não o piloto completo. Todos os usuários, empresas,
-coordenadas, produtos, saldos e pagamentos de demonstração são **sintéticos**.
-Não cadastre dados pessoais reais nem use esta API para movimentar dinheiro real.
+**recorte funcional da V5**, usado para testes com frontend e mobile. Cadastro,
+login e sessões também funcionam em produção com emails reais. O fluxo
+financeiro continua **simulado**, sem movimentação de dinheiro real.
+O conjunto de demonstração é preservado e pode ser compartilhado com essas contas.
 
 ## Backend online
 
 O backend está disponível online. Acesse a
 [documentação interativa da API (Swagger)](https://api.rotalog.madebyhermes.com/docs).
 
-Funciona: cadastro sintético, login, refresh/revogação de sessão, catálogo canônico,
+Funciona: cadastro, login, refresh/revogação de sessão, catálogo canônico,
 depósitos, ofertas, estoque/capacidade manual, reserva de checkout, compra com
 pagamento simulado, consulta/aceite/recusa de pedidos, separação, prontidão e
 rastreamento sintético de rota por GPS. O fluxo canônico da demo acrescenta
@@ -27,9 +28,13 @@ da demo é simplificado e aceita somente arquivos sintéticos; não é antivíru
 
 Mobile: [manifesto, conferência, divergências, tracking canônico e compatibilidade](docs/mobile-integracao-v5.md).
 
+Frontend: [levantamento, novos endpoints, isolamento por fornecedor e convites](docs/frontend-pendencias-v5.md).
+
+Produção: [configuração, primeiro administrador, cadastro e dados de teste existentes](docs/autenticacao-producao.md).
+
 Não funciona ainda: entregas com divergências/retornos, disputa, auditoria global,
 relógio controlado/reset de cenários, MFA/recuperação de senha,
-convites organizacionais e integrações reais. Não confundir encerramento da rota
+integrações financeiras reais. Não confundir encerramento da rota
 legada de GPS com confirmação de entrega. Web/mobile podem usar os novos contratos
 para o recebimento integral; fluxos ainda ausentes devem ser claramente identificados,
 sem misturar mocks com pedidos reais da API. Veja o [guia de cadastro e entrega](docs/demo-produtos-entrega.md).
@@ -137,21 +142,27 @@ Reutilização revoga a família. Logout, revogação de dispositivo e troca de 
 invalidam sessões imediatamente no PostgreSQL. Senhas usam Argon2id.
 
 Navegador: use `/auth/login?client_type=browser` a partir de uma origem da allowlist.
-O refresh fica em cookie host-only `HttpOnly`, `SameSite=Lax`, caminho `/api/v1/auth`;
+O refresh fica em cookie host-only `HttpOnly`, `SameSite=Lax` por padrão, caminho `/api/v1/auth`;
 não aparece no JSON. Access token fica em memória. Refresh/logout por cookie exigem
 `Origin` autorizado e `X-CSRF-Token` recebido no login. Envie `credentials: include`.
 O cliente deve serializar refreshes: repetir refresh antigo revoga a sessão.
 Android usa Bearer/refresh no protocolo, sem cookie e sem depender de CORS.
 No navegador local, use `localhost` para API e portal, ou `127.0.0.1` para ambos;
 misturar os dois hosts torna o cookie cross-site e `SameSite=Lax` impede seu envio.
+Para portal/API em sites distintos, configure `ROTALOG_COOKIE_SAMESITE=none`
+com cookies seguros e HTTPS. A proteção por Origin e CSRF permanece obrigatória.
 
 `GET /api/v1/me` lista organizações e capacidades. `X-Organization-Id` escolhe um
 vínculo autorizado; se omitido, usa a organização inicial da conta. Cada caso de
 uso revalida sessão e `Membership` na transação. UUID não é prova de acesso.
 
 O autocadastro em `POST /api/v1/auth/register` aceita somente comprador e fornecedor.
-Motoristas são provisionados pelo planejador em `POST /api/v1/drivers`, com email
-sintético `.invalid`, nome e senha inicial de pelo menos 12 caracteres. A resposta
+Administradores podem provisionar administradores/planejadores com vínculo
+organizacional em `POST /api/v1/admin/users` ou emitir convites de uso único
+em `POST /api/v1/admin/invitations`. Veja os contratos no guia do frontend.
+Motoristas são provisionados pelo planejador em `POST /api/v1/drivers`, com email,
+nome e senha inicial de pelo menos 12 caracteres. Somente o modo de demonstração
+exige domínio `.invalid`; produção aceita emails reais. A resposta
 não inclui senha; compartilhe a senha inicial por canal privado e o motorista deve
 alterá-la após entrar.
 

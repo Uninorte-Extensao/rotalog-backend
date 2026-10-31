@@ -86,3 +86,38 @@ def test_online_demo_requires_secure_cookie_and_exact_https_origins():
         ).environment
         is Environment.DEMO
     )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"jwt_secret": None},
+        {"cookie_secure": False},
+        {"debug": True},
+        {"cors_origins": ["http://portal.example.com"]},
+    ],
+)
+def test_production_identity_requires_signing_key_https_and_no_debug(changes):
+    base = {
+        "_env_file": None,
+        "environment": "production",
+        "demo_enabled": False,
+        "database_url": "postgresql+psycopg://localhost/rotalog_test",
+        "jwt_secret": "production-test-secret-more-than-32-bytes",
+        "cookie_secure": True,
+        "cors_origins": ["https://portal.example.com"],
+    }
+    with pytest.raises(ValidationError):
+        Settings(**(base | changes))
+    assert Settings(**base, data_context_id="").data_context_id is None
+
+
+def test_cross_site_cookie_requires_secure_transport():
+    with pytest.raises(ValidationError, match="SameSite=None"):
+        Settings(
+            _env_file=None,
+            database_url="postgresql+psycopg://localhost/rotalog_test",
+            demo_enabled=False,
+            cookie_samesite="none",
+            cookie_secure=False,
+        )

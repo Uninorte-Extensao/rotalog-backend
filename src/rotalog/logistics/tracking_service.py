@@ -10,6 +10,7 @@ from geoalchemy2 import WKTElement
 from sqlalchemy import func, select, tuple_
 
 from rotalog.core.contracts import fail
+from rotalog.core.data_mode import is_synthetic_data
 from rotalog.core.database import transactional_session
 from rotalog.identity.models import Role
 from rotalog.identity.service import authorize
@@ -81,7 +82,7 @@ def current_view(session, route, settings):
         "is_stale": stale,
         "position": _point_response(point) if point else None,
         "operational_version": route.version,
-        "is_synthetic": True,
+        "is_synthetic": is_synthetic_data(),
     }
 
 
@@ -309,7 +310,7 @@ def ingest(route_id, data, actor, factory, settings):
             "route_id": str(route.id),
             "results": results,
             "operational_version": route.version,
-            "is_synthetic": True,
+            "is_synthetic": is_synthetic_data(),
         }
         session.flush()
         return batch.response
@@ -364,7 +365,7 @@ def get_history(route_id, actor, factory, *, cursor=None, page_size=50):
             "route_id": str(route.id),
             "items": [_point_response(p) for p in points],
             "next_cursor": next_cursor,
-            "is_synthetic": True,
+            "is_synthetic": is_synthetic_data(),
         }
 
 

@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rotalog.core.contracts import Input
+from rotalog.core.data_mode import is_synthetic_data
 
 FilePurpose = Literal[
     "PRODUCT_IMAGE", "DELIVERY_PHOTO", "DELIVERY_SIGNATURE", "CARGO_ISSUE_PHOTO"
@@ -56,9 +57,15 @@ class FileStatus(BaseModel):
     sha256: str
     expires_at: datetime
     rejection_reason: str | None
-    is_synthetic: Literal[True] = True
-    scan_mode: Literal["SYNTHETIC_IMAGE_VALIDATION_ONLY"] = (
-        "SYNTHETIC_IMAGE_VALIDATION_ONLY"
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
+    scan_mode: Literal["SYNTHETIC_IMAGE_VALIDATION_ONLY", "IMAGE_VALIDATION_ONLY"] = (
+        Field(
+            default_factory=lambda: (
+                "SYNTHETIC_IMAGE_VALIDATION_ONLY"
+                if is_synthetic_data()
+                else "IMAGE_VALIDATION_ONLY"
+            )
+        )
     )
 
 

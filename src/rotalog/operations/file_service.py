@@ -13,7 +13,7 @@ from rotalog.core.errors import RotaLogError
 from rotalog.demo.models import DemoRun
 from rotalog.demo.service import require_active_run
 from rotalog.identity.models import Role
-from rotalog.identity.security import require_demo, token_hash
+from rotalog.identity.security import require_identity, token_hash
 from rotalog.identity.service import authorize
 from rotalog.operations.file_models import FileDownloadGrant, FileEvent, StoredFile
 from rotalog.operations.file_schemas import FileStatus
@@ -93,7 +93,7 @@ def _check_receivable(item):
 
 
 def create_intent(data, key, actor, factory, settings):
-    require_demo(settings)
+    require_identity(settings)
     if data.size_bytes > settings.product_image_max_bytes:
         fail("FILE_SIZE_INVALID", "Tamanho acima do limite configurado.", 422)
     with transactional_session(factory) as session:
@@ -168,7 +168,7 @@ def create_intent(data, key, actor, factory, settings):
 
 
 def upload_content(file_id, content, key, actor, factory, settings):
-    require_demo(settings)
+    require_identity(settings)
     if not content or len(content) > settings.product_image_max_bytes:
         fail("FILE_SIZE_INVALID", "Tamanho de imagem inválido.", 422)
     payload = {
@@ -232,7 +232,7 @@ def _inspect_stored(settings, run_id, file_id, size, sha, mime):
 
 
 def confirm_upload(file_id, key, actor, factory, settings):
-    require_demo(settings)
+    require_identity(settings)
     operation = f"product-image:confirm:{file_id}"
     with transactional_session(factory) as session:
         authorize(session, actor, {Role.ADMIN, Role.DRIVER}, write=True)
@@ -277,7 +277,7 @@ def confirm_upload(file_id, key, actor, factory, settings):
 
 def process_product_image_files(factory, settings, *, limit=20, file_id=None):
     """Fila PostgreSQL recuperável. Validação sintética NÃO comprova ausência de malware."""
-    require_demo(settings)
+    require_identity(settings)
     processed = 0
     for _ in range(limit):
         with transactional_session(factory) as session:
@@ -306,7 +306,11 @@ def process_product_image_files(factory, settings, *, limit=20, file_id=None):
                 break
             item.status, item.scan_token = "SCANNING", uuid4()
             item.scan_until = now + timedelta(minutes=2)
-            item.scanner = "SYNTHETIC_IMAGE_VALIDATION_ONLY"
+            item.scanner = (
+                "SYNTHETIC_IMAGE_VALIDATION_ONLY"
+                if session.get(DemoRun, item.demo_run_id).is_synthetic
+                else "IMAGE_VALIDATION_ONLY"
+            )
             snapshot = (
                 item.demo_run_id,
                 item.id,

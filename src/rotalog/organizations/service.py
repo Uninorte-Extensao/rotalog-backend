@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from rotalog.core.contracts import Page
+from rotalog.core.data_mode import is_synthetic_data
 from rotalog.core.database import transactional_session
 from rotalog.identity.schemas import UserResponse
 from rotalog.organizations.models import Membership, Organization
@@ -40,7 +41,11 @@ def list_suppliers(
         total = session.scalar(select(func.count()).select_from(query.subquery()))
         return Page(
             items=[
-                {"id": str(item.id), "name": item.name, "is_synthetic": True}
+                {
+                    "id": str(item.id),
+                    "name": item.name,
+                    "is_synthetic": is_synthetic_data(),
+                }
                 for item in session.scalars(
                     query.order_by(Organization.name, Organization.id)
                     .offset((page - 1) * page_size)

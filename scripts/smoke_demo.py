@@ -320,6 +320,7 @@ def main() -> None:
                 fulfillment,
                 order,
                 offer,
+                account_password=password,
                 mobile=args.with_mobile,
                 prepare_only=args.prepare_mobile,
             )
@@ -422,6 +423,8 @@ def main() -> None:
                     "synthetic_accounts": {
                         "supplier_email": f"distribuidora.{suffix}@demo.rotalog.invalid",
                         "buyer_email": f"comprador.{suffix}@demo.rotalog.invalid",
+                        "planner_email": f"planejador-{suffix}@demo.rotalog.invalid",
+                        "driver_email": f"motorista-{suffix}@demo.rotalog.invalid",
                         "password_source": "ROTALOG_SMOKE_ACCOUNT_PASSWORD"
                         if os.getenv("ROTALOG_SMOKE_ACCOUNT_PASSWORD")
                         else "RANDOM_NOT_EXPORTED",

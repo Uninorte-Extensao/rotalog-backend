@@ -1,6 +1,7 @@
 """Registro explícito dos modelos para migrações e ferramentas de banco."""
 
 from rotalog.catalog.models import (
+    Category,
     Offer,
     OfferPriceVersion,
     Product,
@@ -9,7 +10,13 @@ from rotalog.catalog.models import (
 )
 from rotalog.demo.models import DemoRun
 from rotalog.finance.models import Payment, PaymentAllocation
-from rotalog.identity.models import AuthSession, LoginThrottle, RefreshToken, User
+from rotalog.identity.models import (
+    AuthSession,
+    LoginThrottle,
+    RefreshToken,
+    User,
+    UserInvitation,
+)
 from rotalog.inventory.models import (
     CapacitySlot,
     InventoryAdjustment,
@@ -64,6 +71,7 @@ __all__ = [
     "CargoInspection",
     "CargoIssue",
     "CargoIssuePhoto",
+    "Category",
     "CheckoutLine",
     "CheckoutSession",
     "CurrentRoutePosition",
@@ -108,6 +116,7 @@ __all__ = [
     "StoredFile",
     "SupplierOrder",
     "User",
+    "UserInvitation",
     "Vehicle",
     "Warehouse",
 ]

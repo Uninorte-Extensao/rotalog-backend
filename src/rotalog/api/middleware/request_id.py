@@ -6,6 +6,8 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
+from rotalog.core.data_mode import synthetic_data
+
 REQUEST_ID_HEADER = "X-Request-Id"
 
 
@@ -21,7 +23,11 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         request_id = self._resolve_request_id(received_request_id)
         request.state.request_id = request_id
 
-        response = await call_next(request)
+        token = synthetic_data.set(request.app.state.settings.demo_enabled)
+        try:
+            response = await call_next(request)
+        finally:
+            synthetic_data.reset(token)
         response.headers[REQUEST_ID_HEADER] = request_id
         return response
 

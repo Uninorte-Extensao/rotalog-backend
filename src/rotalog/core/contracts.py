@@ -1,9 +1,10 @@
 """Tipos comuns de entrada, paginação e conflitos versionados."""
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from rotalog.core.data_mode import data_label, is_synthetic_data
 from rotalog.core.errors import RotaLogError
 
 Name = Annotated[
@@ -29,8 +30,8 @@ class Page[T](BaseModel):
     total: int
     page: int
     page_size: int
-    is_synthetic: Literal[True] = True
-    label: str = "SIMULAÇÃO — dados sintéticos"
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
+    label: str = Field(default_factory=data_label)
 
 
 def fail(code: str, message: str, status: int = 409) -> None:

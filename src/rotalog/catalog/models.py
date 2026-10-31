@@ -23,11 +23,19 @@ from sqlalchemy.orm import Mapped, mapped_column
 from rotalog.core.database import Base, TimestampMixin, UuidPrimaryKeyMixin
 
 
+class Category(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "category"
+    __table_args__ = (UniqueConstraint("demo_run_id", "code"),)
+    demo_run_id: Mapped[UUID] = mapped_column(ForeignKey("demo_run.id"))
+    code: Mapped[str] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(200))
+
+
 class Product(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "product"
     __table_args__ = (
         CheckConstraint(
-            "publication_state IN ('DRAFT', 'PUBLISHED')",
+            "publication_state IN ('DRAFT', 'PUBLISHED', 'UNPUBLISHED')",
             name="publication_state_valid",
         ),
         CheckConstraint(

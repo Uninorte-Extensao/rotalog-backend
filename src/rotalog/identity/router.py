@@ -15,17 +15,55 @@ from rotalog.identity.dependencies import (
     SessionFactory,
 )
 from rotalog.identity.schemas import (
+    InvitationAccept,
+    InvitationCreate,
+    InvitationResponse,
     PasswordChange,
     RefreshRequest,
     RegisterRequest,
     SessionResponse,
     TokenResponse,
+    UserProvisionRequest,
     UserResponse,
 )
 
 router = APIRouter(tags=["identidade"])
 COOKIE = "rotalog_refresh"
 COOKIE_PATH = "/api/v1/auth"
+
+
+@router.post("/admin/users", response_model=UserResponse, status_code=201)
+def provision_user(
+    data: UserProvisionRequest,
+    actor: CurrentUser,
+    factory: SessionFactory,
+    settings: ApplicationSettings,
+):
+    return service.provision_user(data, actor, factory, settings)
+
+
+@router.post("/admin/invitations", response_model=InvitationResponse, status_code=201)
+def create_invitation(
+    data: InvitationCreate,
+    actor: CurrentUser,
+    factory: SessionFactory,
+    response: Response,
+    settings: ApplicationSettings,
+):
+    response.headers["Cache-Control"] = "no-store"
+    return service.create_invitation(data, actor, factory, settings)
+
+
+@router.delete("/admin/invitations/{invitation_id}", status_code=204)
+def revoke_invitation(invitation_id: UUID, actor: CurrentUser, factory: SessionFactory):
+    service.revoke_invitation(invitation_id, actor, factory)
+
+
+@router.post("/auth/invitations/accept", response_model=UserResponse, status_code=201)
+def accept_invitation(
+    data: InvitationAccept, factory: SessionFactory, settings: ApplicationSettings
+):
+    return service.accept_invitation(data, factory, settings)
 
 
 def _deliver(
@@ -40,7 +78,7 @@ def _deliver(
             max_age=30 * 86400,
             httponly=True,
             secure=settings.cookie_secure,
-            samesite="lax",
+            samesite=settings.cookie_samesite,
             path=COOKIE_PATH,
         )
         return result.model_copy(update={"refresh_token": None})
@@ -51,7 +89,7 @@ def _deliver(
     "/auth/register",
     response_model=UserResponse,
     status_code=201,
-    description="Extensão de demonstração: somente identidades sintéticas e organizações novas.",
+    description="Cadastro de comprador/fornecedor em organização própria. Papéis administrativos são provisionados ou convidados.",
 )
 def register(
     data: RegisterRequest, factory: SessionFactory, settings: ApplicationSettings
@@ -140,7 +178,7 @@ def logout(
         path=COOKIE_PATH,
         secure=settings.cookie_secure,
         httponly=True,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
     )
     response.headers["Cache-Control"] = "no-store"
 

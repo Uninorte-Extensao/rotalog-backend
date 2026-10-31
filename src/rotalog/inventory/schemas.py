@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -13,6 +13,7 @@ from rotalog.core.contracts import (
     Reason,
     Versioned,
 )
+from rotalog.core.data_mode import is_synthetic_data
 
 
 class WarehouseCreate(Input):
@@ -36,7 +37,7 @@ class WarehouseResponse(WarehouseCreate):
     is_active: bool
     version: int
     demo_run_id: UUID
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class GeocodingReview(Versioned):
@@ -78,7 +79,7 @@ class InventoryResponse(BaseModel):
     received_at: datetime
     last_reconciled_at: datetime | None
     demo_run_id: UUID
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class CapacityCreate(Input):
@@ -112,4 +113,4 @@ class CapacityResponse(BaseModel):
     total_quantity: int
     reserved_quantity: int
     version: int
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)

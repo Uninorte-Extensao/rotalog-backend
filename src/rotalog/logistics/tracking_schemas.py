@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from rotalog.core.contracts import Input
+from rotalog.core.data_mode import is_synthetic_data
 
 
 class TrackingPoint(Input):
@@ -85,7 +86,7 @@ class BatchResponse(BaseModel):
     route_id: UUID
     results: list[BatchPointResult]
     operational_version: int
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class TrackingCurrent(BaseModel):
@@ -101,11 +102,11 @@ class TrackingCurrent(BaseModel):
     is_stale: bool
     position: PointResponse | None
     operational_version: int
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)
 
 
 class TrackingHistory(BaseModel):
     route_id: UUID
     items: list[PointResponse]
     next_cursor: str | None
-    is_synthetic: Literal[True] = True
+    is_synthetic: bool = Field(default_factory=is_synthetic_data)

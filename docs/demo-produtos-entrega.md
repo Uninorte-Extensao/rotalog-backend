@@ -49,6 +49,13 @@ Se a oferta for criada e o ajuste falhar, corrija pelo inventário: não repita 
 
 ### 3. Planejador: rota manual
 
+O planejador e o motorista do seed operam apenas para o fornecedor do seed.
+Para uma distribuidora nova, o administrador deve criar um planejador vinculado
+a ela por `POST /admin/users` ou convite; esse planejador cria seu motorista em
+`POST /drivers`. Use essas contas no fluxo abaixo. Consulte também
+`GET /route-planning/eligible-fulfillments` para obter os lotes prontos da origem.
+Veja [os contratos e a migração de isolamento](frontend-pendencias-v5.md).
+
 1. Login `planejador@demo.rotalog.invalid`; consultar `GET /drivers` para o motorista sintético ativo.
 2. `POST /vehicles` com identificação sintética única e capacidades inteiras `package_units`, `weight_grams`, `volume_cm3`; consultar `/vehicles` para reutilizar veículo.
 3. `POST /route-plan-versions` é uma extensão explícita da demo para criar a proposta manual, sem chamar um otimizador:
